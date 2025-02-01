@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
-
+import cartopy.feature as cfeature
 
 class DB_Map():
     def __init__(self, database):
@@ -20,7 +20,7 @@ class DB_Map():
                             )''')
             conn.commit()
 
-    def add_city(self,user_id, city_name ):
+    def add_city(self, user_id, city_name):
         conn = sqlite3.connect(self.database)
         with conn:
             cursor = conn.cursor()
@@ -34,7 +34,6 @@ class DB_Map():
             else:
                 return 0
 
-            
     def select_cities(self, user_id):
         conn = sqlite3.connect(self.database)
         with conn:
@@ -47,7 +46,6 @@ class DB_Map():
             cities = [row[0] for row in cursor.fetchall()]
             return cities
 
-
     def get_coordinates(self, city_name):
         conn = sqlite3.connect(self.database)
         with conn:
@@ -58,32 +56,46 @@ class DB_Map():
             coordinates = cursor.fetchone()
             return coordinates
 
-    def create_graph(self, path, cities):
+    def create_graph(self, path, cities, marker_color='blue'):
         ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.stock_img()
         
+        # Заливка океанов и континентов
+        ax.add_feature(cfeature.OCEAN, color='lightblue')
+        ax.add_feature(cfeature.LAND, color='lightgreen')
+        ax.add_feature(cfeature.COASTLINE)
+        ax.add_feature(cfeature.BORDERS, linestyle=':')
+        ax.add_feature(cfeature.LAKES, color='lightblue')
+        ax.add_feature(cfeature.RIVERS)
+
+        # Собираем координаты всех городов
+        lats, lngs = [], []
         for city in cities:
             coordinates = self.get_coordinates(city)
-
             if coordinates:
                 lat, lng = coordinates
+                lats.append(lat)
+                lngs.append(lng)
                 plt.plot([lng], [lat],
-                color='blue', linewidth=2, marker='o',
-                transform=ccrs.Geodetic(),)
-                
+                         color=marker_color, linewidth=2, marker='o',
+                         transform=ccrs.Geodetic())
                 plt.text(lng - 3, lat - 12, city,
-                horizontalalignment='right',
-                transform=ccrs.Geodetic())
-        
+                         horizontalalignment='right',
+                         transform=ccrs.Geodetic())
+
+        # Настройка области отображения для всех городов
+        if lats and lngs:
+            min_lat, max_lat = min(lats), max(lats)
+            min_lng, max_lng = min(lngs), max(lngs)
+            # Добавляем буфер для лучшего отображения
+            buffer = 10  # Размер буфера в градусах
+            ax.set_extent([min_lng - buffer, max_lng + buffer, min_lat - buffer, max_lat + buffer])
+
         plt.savefig(path)
         plt.close()
 
-        
     def draw_distance(self, city1, city2):
         pass
 
-
-if __name__=="__main__":
-    
+if __name__ == "__main__":
     m = DB_Map(DATABASE)
     m.create_user_table()
